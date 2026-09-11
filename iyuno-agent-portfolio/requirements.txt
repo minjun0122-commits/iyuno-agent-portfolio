@@ -1,6 +1,0 @@
-scikit-learn>=1.4
-numpy>=1.26
-matplotlib>=3.8
-streamlit>=1.35
-pytest>=8.0
-anthropic>=0.30  # optional: only used if ANTHROPIC_API_KEY is set (agent/router.py answer_query_llm)
