@@ -132,3 +132,15 @@ Every push runs the full pipeline: install deps → ingest corpus → `pytest` �
 ## Retrospective
 
 See `RETROSPECTIVE.md`.
+
+## Side project: Naver SmartStore dropshipping automation
+
+`smartstore/` is a separate package (it does not touch `agent/`) that automates
+a Naver SmartStore dropshipping store via the Naver Commerce API: new-order
+confirmation, supplier purchasing, tracking upload, inventory/price sync and
+Q&A reply drafts. Every write is dry-run unless `--apply` is passed.
+Plan and runbook: [`docs/smartstore/PLAN.md`](docs/smartstore/PLAN.md).
+
+```bash
+python -m smartstore.jobs all --mock   # full pipeline on sample data, no credentials
+```
