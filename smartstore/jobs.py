@@ -6,6 +6,8 @@
     python -m smartstore.jobs sync-inventory --apply
     python -m smartstore.jobs draft-cs [--apply [--post]]
     python -m smartstore.jobs all --mock             # full pipeline on sample data, no credentials needed
+
+Add --notify to email a summary when something needs attention (see smartstore/notify.py).
 """
 from __future__ import annotations
 
@@ -45,6 +47,7 @@ def run(argv: list[str] | None = None) -> dict:
     parser.add_argument("--apply", action="store_true", help="perform writes (default is dry-run)")
     parser.add_argument("--post", action="store_true", help="draft-cs: also post answers (requires --apply)")
     parser.add_argument("--mock", action="store_true", help="use in-memory sample data instead of the real API")
+    parser.add_argument("--notify", action="store_true", help="email a summary if anything needs attention")
     args = parser.parse_args(argv)
 
     settings = Settings.from_env()
@@ -63,13 +66,18 @@ def run(argv: list[str] | None = None) -> dict:
         results["sync-inventory"] = sync_inventory(product_api, supplier, settings, product_map, dry_run=dry_run)
     if args.command in ("draft-cs", "all"):
         results["draft-cs"] = draft_cs(qna_api, store, settings.cs_model, post=args.post, dry_run=dry_run)
+    if args.notify:
+        from smartstore.notify import build_summary, send
+
+        summary = build_summary(results)
+        results["notified"] = bool(summary) and send(summary)
     return results
 
 
 def main() -> int:
     results = run()
     print(json.dumps(results, ensure_ascii=False, indent=2))
-    failed = sum(len(r.get("failed", [])) for r in results.values())
+    failed = sum(len(r.get("failed", [])) for r in results.values() if isinstance(r, dict))
     return 2 if failed else 0
 
 

@@ -1,6 +1,7 @@
 """In-memory stand-ins for the Commerce API, used by tests and `jobs --mock`."""
 from __future__ import annotations
 
+import copy
 from datetime import datetime
 
 from smartstore.suppliers.base import SupplierItem
@@ -58,7 +59,7 @@ class FakeProductAPI:
         self.puts: list[tuple[str, dict]] = []
 
     def get_origin(self, no: str) -> dict:
-        return {"originProduct": dict(self.products[no])}
+        return {"originProduct": copy.deepcopy(self.products[no])}
 
     def put_origin(self, no: str, body: dict) -> dict:
         self.products[no] = body["originProduct"]
@@ -79,29 +80,46 @@ class FakeQnaAPI:
         return {}
 
 
+def _pillow(stock_pink: int, stock_gray: int, stock_brown: int) -> dict:
+    return {
+        "salePrice": 19900,
+        "stockQuantity": stock_pink + stock_gray + stock_brown,
+        "detailAttribute": {"optionInfo": {"optionCombinations": [
+            {"id": 1, "optionName1": "핑크", "stockQuantity": stock_pink},
+            {"id": 2, "optionName1": "그레이", "stockQuantity": stock_gray},
+            {"id": 3, "optionName1": "브라운", "stockQuantity": stock_brown},
+        ]}},
+    }
+
+
 def demo_fixtures():
-    """Sample data for `python -m smartstore.jobs ... --mock`."""
+    """홈리빙클럽 sample data for `python -m smartstore.jobs ... --mock`.
+
+    Costs are 총원가 (supplier price + shipping). The spice-container cost is a
+    placeholder; the option SKUs (-PK/-GY/-BR) are illustrative, not OwnerClan codes.
+    """
     supplier = MockSupplier(items={
-        "SKU-TUMBLER": SupplierItem("SKU-TUMBLER", True, 50, cost=8000, shipping_fee=3000),
-        "SKU-CABLE": SupplierItem("SKU-CABLE", True, 0, cost=2500, shipping_fee=3000),
-        "SKU-LAMP": SupplierItem("SKU-LAMP", True, 12, cost=15000, shipping_fee=3500),
+        "WFGYD7O-PK": SupplierItem("WFGYD7O-PK", True, 20, cost=12480),
+        "WFGYD7O-GY": SupplierItem("WFGYD7O-GY", True, 8, cost=12480),   # restocked at the supplier
+        "WFGYD7O-BR": SupplierItem("WFGYD7O-BR", False, 0, cost=12480),  # still sold out
+        "SPICE-STS": SupplierItem("SPICE-STS", True, 30, cost=14500),
     })
     orders = FakeOrderAPI([
-        make_order("2026092900001", "SKU-TUMBLER", 2),
-        make_order("2026092900002", "SKU-CABLE", 1),
-        make_order("2026092900003", "SKU-LAMP", 1),
-        make_order("2026092900004", "SKU-LAMP", 1, status="CANCELED"),
+        make_order("2026092900001", "WFGYD7O-PK", 1),
+        make_order("2026092900002", "WFGYD7O-BR", 1),
+        make_order("2026092900003", "SPICE-STS", 1),
+        make_order("2026092900004", "SPICE-STS", 1, status="CANCELED"),
     ])
     products = FakeProductAPI({
-        "1001": {"salePrice": 12900, "stockQuantity": 50},
-        "1002": {"salePrice": 6900, "stockQuantity": 30},
-        "1003": {"salePrice": 21900, "stockQuantity": 12},
+        "1001": _pillow(stock_pink=20, stock_gray=0, stock_brown=0),
+        "1002": {"salePrice": 22900, "stockQuantity": 30},
     })
-    product_map = [{"origin_product_no": "1001", "sku": "SKU-TUMBLER"},
-                   {"origin_product_no": "1002", "sku": "SKU-CABLE"},
-                   {"origin_product_no": "1003", "sku": "SKU-LAMP"}]
+    product_map = [{"origin_product_no": "1001", "sku": "WFGYD7O-PK", "option_name": "핑크"},
+                   {"origin_product_no": "1001", "sku": "WFGYD7O-GY", "option_name": "그레이"},
+                   {"origin_product_no": "1001", "sku": "WFGYD7O-BR", "option_name": "브라운"},
+                   {"origin_product_no": "1002", "sku": "SPICE-STS", "option_name": ""}]
     qna = FakeQnaAPI([
-        {"questionId": 501, "question": "언제 배송되나요?", "productName": "보온 텀블러"},
-        {"questionId": 502, "question": "색상 추가 예정 있나요?", "productName": "무드등"},
+        {"questionId": 501, "question": "그레이 색상 언제 입고되나요?", "productName": "고양이 바디필로우 90cm"},
+        {"questionId": 502, "question": "세탁 가능한가요?", "productName": "고양이 바디필로우 90cm"},
     ])
     return supplier, orders, products, product_map, qna

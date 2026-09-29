@@ -4,6 +4,7 @@ from smartstore.config import Settings
 from smartstore.cs import draft_answer, draft_cs, template_answer
 from smartstore.fakes import FakeProductAPI, FakeQnaAPI
 from smartstore.jobs import run
+from smartstore.notify import build_summary
 from smartstore.products import sync_inventory
 from smartstore.store import Store
 from smartstore.suppliers.base import PurchaseRequest, SupplierItem
@@ -20,11 +21,56 @@ def test_inventory_sync_updates_price_and_zeroes_unavailable():
     dry = sync_inventory(api, supplier, Settings(), pm, dry_run=True)
     assert len(dry["planned"]) == 2 and api.puts == []
 
-    sync_inventory(api, supplier, Settings(), pm, dry_run=False)
+    report = sync_inventory(api, supplier, Settings(), pm, dry_run=False)
     assert api.products["1"]["stockQuantity"] == 7
     assert api.products["1"]["salePrice"] > 11000
     assert api.products["2"]["stockQuantity"] == 0
+    assert report["sold_out"] == ["2"]
     assert sync_inventory(api, supplier, Settings(), pm, dry_run=False)["unchanged"] == 2
+
+
+def test_inventory_never_lowers_a_price_that_meets_target_margin():
+    supplier = MockSupplier(items={"A": SupplierItem("A", True, 5, cost=12480)})
+    api = FakeProductAPI({"1": {"salePrice": 19900, "stockQuantity": 5}})
+    report = sync_inventory(api, supplier, Settings(), [{"origin_product_no": "1", "sku": "A"}], dry_run=False)
+    assert report["unchanged"] == 1 and api.puts == []
+
+
+def _pillow_api(pink, gray, brown):
+    return FakeProductAPI({"1": {"salePrice": 19900, "stockQuantity": pink + gray + brown, "detailAttribute": {
+        "optionInfo": {"optionCombinations": [
+            {"optionName1": "핑크", "stockQuantity": pink},
+            {"optionName1": "그레이", "stockQuantity": gray},
+            {"optionName1": "브라운", "stockQuantity": brown}]}}}})
+
+
+PILLOW_MAP = [{"origin_product_no": "1", "sku": "PK", "option_name": "핑크"},
+              {"origin_product_no": "1", "sku": "GY", "option_name": "그레이"},
+              {"origin_product_no": "1", "sku": "BR", "option_name": "브라운"}]
+
+
+def test_option_stock_sync_and_restock_detection():
+    supplier = MockSupplier(items={"PK": SupplierItem("PK", True, 20, cost=12480),
+                                   "GY": SupplierItem("GY", True, 8, cost=12480),
+                                   "BR": SupplierItem("BR", False, 0, cost=12480)})
+    api = _pillow_api(20, 0, 0)
+    dry = sync_inventory(api, supplier, Settings(), PILLOW_MAP, dry_run=True)
+    assert dry["restocked"] == ["1 그레이"] and api.puts == []
+
+    sync_inventory(api, supplier, Settings(), PILLOW_MAP, dry_run=False)
+    combos = api.products["1"]["detailAttribute"]["optionInfo"]["optionCombinations"]
+    assert [c["stockQuantity"] for c in combos] == [20, 8, 0]
+    assert api.products["1"]["stockQuantity"] == 28
+    assert api.products["1"]["salePrice"] == 19900
+
+
+def test_unknown_option_is_reported_not_written():
+    supplier = MockSupplier(items={"X": SupplierItem("X", True, 1, cost=12480)})
+    api = _pillow_api(1, 0, 0)
+    report = sync_inventory(api, supplier, Settings(), [{"origin_product_no": "1", "sku": "X", "option_name": "블랙"}],
+                            dry_run=True)
+    assert report["ok"] is False
+    assert report["planned"][0]["changes"][0]["error"]
 
 
 def test_cs_template_fallback_without_key(monkeypatch):
@@ -60,7 +106,20 @@ def test_csv_supplier_roundtrip(tmp_path):
 
 def test_jobs_mock_all(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    results = run(["all", "--mock", "--apply"])
+    for k in ("SMARTSTORE_SMTP_HOST", "SMARTSTORE_NOTIFY_TO"):
+        monkeypatch.delenv(k, raising=False)
+    results = run(["all", "--mock", "--apply", "--notify"])
     assert results["sync-orders"]["ordered"] == ["2026092900001", "2026092900003"]
     assert results["sync-tracking"]["shipped"] == ["2026092900001", "2026092900003"]
+    assert results["sync-inventory"]["restocked"] == ["1001 그레이"]
     assert len(results["draft-cs"]["drafted"]) == 2
+    assert results["notified"] is False  # SMTP not configured -> printed only
+
+
+def test_notify_summary():
+    assert build_summary({"sync-orders": {"dry_run": False, "ordered": [], "failed": []}}) is None
+    text = build_summary({
+        "sync-orders": {"dry_run": False, "ordered": ["1"], "failed": [{"product_order_id": "2", "reason": "품절"}]},
+        "sync-inventory": {"restocked": ["1001 그레이"], "sold_out": [], "planned": []},
+    })
+    assert "신규 주문 1건" in text and "직접 처리" in text and "재입고: 1001 그레이" in text

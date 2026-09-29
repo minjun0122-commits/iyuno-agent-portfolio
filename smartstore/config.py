@@ -16,7 +16,7 @@ class Settings:
     # Naver Pay order-management fee + Naver Shopping sales-linked fee.
     # Conservative default (3.63% + 2%); check your seller center for the actual rates.
     fee_rate: float = 0.0563
-    target_margin: float = 0.15
+    target_margin: float = 0.20
     min_margin: float = 0.05
     price_round_to: int = 100
     # Supplier (CSV mode): inventory sheet in, bulk-order sheet out, tracking sheet in.
