@@ -1,5 +1,5 @@
 """
-Generates the 20-document public knowledge corpus used by agentic-knowledge-triage.
+Generates the 20-document public knowledge corpus used by iyuno-agent-portfolio.
 
 Each document is an ORIGINAL explanatory write-up (authored for this coursework
 project, not copy-pasted from any single source) that summarizes a well-known,
