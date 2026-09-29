@@ -1,54 +1,47 @@
-# 1-page retrospective
+# 한 페이지 회고
 
-## What I set out to do
+## 목표
 
-Turn a real job posting (Iyuno, AI Agent Engineer, requisition JR101122) into
-working evidence instead of a resume line, by mapping each requirement
-sentence to a piece of code I could actually run: an LLM agent that does
-retrieval-augmented generation over a document corpus, calls tools in a
-multi-step workflow, and is evaluated with real metrics rather than a demo
-GIF alone.
+실제 채용 공고(Iyuno, AI Agent Engineer, 공고 번호 JR101122)를 이력서 한 줄이 아니라
+동작하는 증거로 바꾸는 것. 공고의 요구사항 문장마다 실제로 실행할 수 있는 코드를
+대응시켰습니다. 문서 말뭉치를 대상으로 RAG를 수행하고, 다단계 workflow에서 도구를
+호출하며, 데모 GIF만이 아니라 실제 지표로 평가하는 LLM 에이전트를 만들었습니다.
 
-## What I actually implemented
+## 구현한 것
 
-- A 20-document corpus (`data/raw/`) covering AI-agent-adjacent security and
-  systems topics, chunked into 60 passages.
-- A TF-IDF retriever (`agent/retriever.py`) with cosine-similarity search and
-  per-chunk citation metadata.
-- Three tools (`agent/tools.py`): a sandboxed calculator, a document search
-  tool, and an exact-id document lookup tool — each logged for
-  observability.
-- A router (`agent/router.py`) that runs a multi-step workflow (classify →
-  call the right tool(s) → compose a cited answer), with a rule-based
-  offline mode for CI/tests and an optional Claude-API mode for real
-  generation.
-- An evaluation suite of 36 questions spanning factual, multi-hop,
-  arithmetic, and out-of-scope categories, producing `hit@4`, a faithfulness
-  proxy, arithmetic accuracy, refusal accuracy, and latency (`evaluation/`).
-- 21 pytest tests and a GitHub Actions CI workflow that installs
-  dependencies, ingests the corpus, runs the tests, and runs the evaluation
-  on every push.
-- A Streamlit demo (`demo/app.py`) that exposes both the offline and
-  LLM-backed modes with a tool-call trace.
+- 에이전트와 관련된 보안·시스템 주제 문서 20개(`data/raw/`), 60개 조각으로 분할
+- TF-IDF 검색기(`agent/retriever.py`): 코사인 유사도 검색, 조각별 출처 정보 포함
+- 도구 3개(`agent/tools.py`): 안전한 계산기, 문서 검색, 문서 id 조회. 모든 호출을 기록
+- 라우터(`agent/router.py`): 질문 분류 → 알맞은 도구 호출 → 출처가 달린 답변 작성.
+  CI·테스트용 규칙 기반 오프라인 모드와, 실제 답변 생성을 위한 Claude API 모드 제공
+- 평가 질문 44개(일반, multi_hop, 바꿔 말한 질문, 계산, 범위 밖)와
+  `hit@4`, faithfulness proxy, 계산 정확도, 거절 정확도, 응답 시간 측정(`evaluation/`)
+- pytest 테스트 21개와, 푸시마다 설치 → 문서 처리 → 테스트 → 평가를 실행하는
+  GitHub Actions CI
+- 오프라인 모드와 LLM 모드를 모두 보여주고 도구 호출 기록을 표시하는 Streamlit 데모
+  (`demo/app.py`)와 시연 GIF(`demo/agent_demo.gif`)
 
-## What worked well
+## 잘 된 점
 
-The offline extractive mode turned out to be the right default: it made the
-whole pipeline (ingest → retrieve → answer → evaluate → test) runnable with
-zero API keys and zero network calls, which is exactly what CI needs, and it
-forces every "answer" to be traceable to a real chunk rather than a
-plausible-sounding hallucination.
+오프라인 추출 모드를 기본으로 둔 것이 옳은 선택이었습니다. API 키와 네트워크 없이도
+문서 처리 → 검색 → 답변 → 평가 → 테스트 전체가 돌아가서 CI에 딱 맞았고, 모든 "답변"이
+그럴듯한 환각이 아니라 실제 문서 조각까지 추적되도록 강제했습니다.
 
-## What's still missing / next steps
+## 배운 점
 
-- Swap the TF-IDF retriever for a dense embedding model to catch
-  vocabulary-mismatch queries the current retriever misses.
-- Add a feedback-loop table (per the job posting's "사용자의 수정 신호를
-  재학습 데이터로 저장함") that stores user corrections for future
-  re-ranking — the architecture diagram anticipates this ("+ feedback") but
-  it isn't wired up to persistent storage yet.
-- Record a short demo GIF/video of the Streamlit app for the submission
-  checklist.
-- If time allows, add a second retrieval backend (BM25) and compare hit@k
-  against the current TF-IDF baseline, since `data/raw/retrieval-augmented-generation.md`
-  itself recommends hybrid retrieval.
+처음 평가에서 hit@4가 1.00이 나왔을 때 좋은 결과라고만 생각했습니다. 그런데 질문이
+문서와 같은 단어를 쓰고 있다는 점이 마음에 걸려, 뜻은 같고 단어만 바꾼 질문 8개를
+추가했더니 정답 문서를 하나도 찾지 못했습니다. 평가 세트가 쉬우면 점수가 약점을 가린다는
+것, 그리고 약점을 직접 드러내는 질문을 따로 만들어야 한다는 것을 배웠습니다.
+
+## 남은 과제
+
+- TF-IDF 검색기를 임베딩 기반 검색으로 교체해서, 바꿔 말한 질문(현재 hit@4 0/8)을
+  개선하기
+- BM25를 추가해 TF-IDF와 hit@k를 비교하고, `data/raw/retrieval-augmented-generation.md`에서
+  권하는 하이브리드 검색 시도하기
+- LLM 모드도 같은 평가 세트로 정량 평가하기 (현재는 `scripts/run_llm_examples.py`로
+  예시만 확인)
+- 공고의 "사용자의 수정 신호를 재학습 데이터로 저장함"에 맞춰, 사용자 수정 내용을 저장해
+  다음 검색 순위에 반영하는 피드백 루프 만들기. 구조도에는 있지만 아직 저장소와 연결되지
+  않았습니다.
