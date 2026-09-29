@@ -34,5 +34,13 @@
   {"id": "q33", "query": "17*24", "expected_doc_id": null, "type": "arithmetic", "expected_value": 408},
   {"id": "q34", "query": "(200-35)/5", "expected_doc_id": null, "type": "arithmetic", "expected_value": 33.0},
   {"id": "q35", "query": "What is the capital of France?", "expected_doc_id": null, "type": "out_of_scope"},
-  {"id": "q36", "query": "Can you book me a flight to Seoul tomorrow?", "expected_doc_id": null, "type": "out_of_scope"}
+  {"id": "q36", "query": "Can you book me a flight to Seoul tomorrow?", "expected_doc_id": null, "type": "out_of_scope"},
+  {"id": "p01", "query": "How can a server stop one customer from flooding it with too many calls?", "expected_doc_id": "api-rate-limiting", "type": "paraphrase"},
+  {"id": "p02", "query": "What stages should a team go through when handling a security breach, from getting ready beforehand to reviewing afterwards?", "expected_doc_id": "incident-response-lifecycle", "type": "paraphrase"},
+  {"id": "p03", "query": "Which kinds of telemetry help engineers understand what a live service is doing?", "expected_doc_id": "logging-and-observability", "type": "paraphrase"},
+  {"id": "p04", "query": "How do I stop attackers from sneaking malicious commands in through a form field?", "expected_doc_id": "secure-coding-input-validation", "type": "paraphrase"},
+  {"id": "p05", "query": "How do you quickly find the closest matches among a huge collection of numeric representations of text?", "expected_doc_id": "vector-databases-overview", "type": "paraphrase"},
+  {"id": "p06", "query": "Why should most automated checks be small and quick, with only a few full-system checks?", "expected_doc_id": "ci-cd-testing-pyramid", "type": "paraphrase"},
+  {"id": "p07", "query": "Why do chatbots sometimes make things up that sound convincing?", "expected_doc_id": "hallucination-and-grounding", "type": "paraphrase"},
+  {"id": "p08", "query": "Can hidden text on a web page trick an AI assistant into ignoring what it was told to do?", "expected_doc_id": "prompt-injection-defense", "type": "paraphrase"}
 ]

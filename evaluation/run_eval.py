@@ -67,7 +67,7 @@ def run() -> dict:
         elif item["type"] == "out_of_scope":
             declined_phrases = ["don't have enough", "don't know", "not able to", "cannot"]
             row["correct"] = any(p in resp.answer.lower() for p in declined_phrases)
-        else:  # factual / multi_hop
+        else:  # factual / multi_hop / paraphrase
             hits = retriever.search(query, k=4)
             retrieved_doc_ids = {h.doc_id for h in hits}
             row["hit_at_k"] = item["expected_doc_id"] in retrieved_doc_ids
@@ -83,12 +83,19 @@ def run() -> dict:
     factual_rows = [r for r in per_question if r["type"] in ("factual", "multi_hop")]
     arith_rows = [r for r in per_question if r["type"] == "arithmetic"]
     oos_rows = [r for r in per_question if r["type"] == "out_of_scope"]
+    # Paraphrase questions reuse none of the key terms in their target document,
+    # so they measure the vocabulary-mismatch weakness of TF-IDF on its own.
+    para_rows = [r for r in per_question if r["type"] == "paraphrase"]
 
     summary = {
         "n_questions": len(per_question),
         "hit_at_4": _avg("hit_at_k", factual_rows),
         "faithfulness_proxy": (
             round(sum(1 for r in factual_rows if r["correct"]) / len(factual_rows), 4) if factual_rows else None
+        ),
+        "paraphrase_hit_at_4": _avg("hit_at_k", para_rows),
+        "paraphrase_faithfulness_proxy": (
+            round(sum(1 for r in para_rows if r["correct"]) / len(para_rows), 4) if para_rows else None
         ),
         "arithmetic_accuracy": (
             round(sum(1 for r in arith_rows if r["correct"]) / len(arith_rows), 4) if arith_rows else None
@@ -124,18 +131,20 @@ def _plot(summary: dict) -> None:
         print("matplotlib not installed; skipping metrics.png")
         return
 
-    labels = ["hit@4", "faithfulness", "arithmetic", "refusal"]
+    labels = ["hit@4", "faithfulness", "paraphrase\nhit@4", "paraphrase\nfaithfulness", "arithmetic", "refusal"]
     values = [
         summary["hit_at_4"] or 0,
         summary["faithfulness_proxy"] or 0,
+        summary["paraphrase_hit_at_4"] or 0,
+        summary["paraphrase_faithfulness_proxy"] or 0,
         summary["arithmetic_accuracy"] or 0,
         summary["refusal_accuracy"] or 0,
     ]
-    fig, ax = plt.subplots(figsize=(6, 4))
-    bars = ax.bar(labels, values, color=["#4C6EF5", "#12B886", "#F59F00", "#E64980"])
+    fig, ax = plt.subplots(figsize=(8, 4))
+    bars = ax.bar(labels, values, color=["#4C6EF5", "#12B886", "#748FFC", "#63E6BE", "#F59F00", "#E64980"])
     ax.set_ylim(0, 1.05)
     ax.set_ylabel("Score")
-    ax.set_title("agentic-knowledge-triage — evaluation summary")
+    ax.set_title("iyuno-agent-portfolio — evaluation summary")
     for bar, v in zip(bars, values):
         ax.text(bar.get_x() + bar.get_width() / 2, v + 0.02, f"{v:.2f}", ha="center")
     fig.tight_layout()
